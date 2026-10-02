@@ -118,6 +118,14 @@ kommer notisen ändå, Pi:n försöker igen nästa dygn och varnar högst en gå
 | Prova sammanfattning av det senaste | `./venv/bin/python bevakningar/hd_avgoranden.py --testa` |
 | Fyll på dokumentet med alla avgöranden sedan ett datum | `./venv/bin/python bevakningar/hd_avgoranden.py --fyll-pa 2026-09-01` |
 
+### När dokumentet blir fullt
+
+Ett Google-dokument rymmer högst cirka 1 020 000 tecken (ungefär 110 avgöranden).
+Pi:n räknar tecknen och skickar en notis vid 80 % och 95 %. Överenskommet: vid
+80 %-varningen byggs automatiskt dokumentbyte in – Apps Script skapar ett nytt
+dokument i samma Drive-mapp (t.ex. "Claude HD-bevakning 2") när det gamla är fullt,
+och Pi:n skickar en notis om att det nya ska läggas till som källa i NotebookLM.
+
 ## Principer
 
 Bevakningarna läser bara. De bokar, köper eller fyller aldrig i något, och de
