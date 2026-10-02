@@ -352,6 +352,37 @@ def _skriv_i_dokument(konfig, u):
         raise RuntimeError(f"dokumentet svarade: {text[:200]}")
 
 
+# Ett Google-dokument rymmer högst 1 020 000 tecken. Pi:n håller räkningen själv
+# (summan av det den skrivit) och varnar när dokumentet börjar bli fullt.
+DOKUMENT_MAX_TECKEN = 1_020_000
+VARNINGSGRANSER = (0.8, 0.95)
+UPPSKATTNING_PER_POST = 9000  # för poster skrivna innan räkningen infördes
+
+
+def _registrera_tecken(dok, u):
+    tecken = sum(len(b.get("text", "")) + len(b.get("etikett", "")) + 4 for b in _block(u))
+    dok.setdefault("tecken", {})[u["id"]] = tecken
+
+
+def _dokumentvarning(dok):
+    """Returnerar ett fynd om dokumentet närmar sig Googles tak, annars None."""
+    raknade = dok.get("tecken", {})
+    ids = {s.split(":")[0] for s in dok.get("skrivna", [])}
+    totalt = sum(raknade.get(i, UPPSKATTNING_PER_POST) for i in ids)
+    andel = totalt / DOKUMENT_MAX_TECKEN
+    passerade = [g for g in VARNINGSGRANSER if andel >= g]
+    if not passerade:
+        return None
+    grans = max(passerade)
+    return {
+        "id": f"hd-dokument-fullt-{int(grans * 100)}",
+        "text": (f"📄 Dokumentet Claude HD-bevakning är till ungefär {andel:.0%} fullt "
+                 f"(cirka {totalt:,} av högst {DOKUMENT_MAX_TECKEN:,} tecken). "
+                 "Dags att börja på ett nytt dokument – fråga Claude.").replace(",", " "),
+        "url": DOKUMENT_LANK,
+    }
+
+
 def _dokument_installt(konfig):
     return bool(konfig.get("hd_dokument_url") and konfig.get("hd_dokument_nyckel"))
 
@@ -389,6 +420,7 @@ def kontrollera(webblasare):
         try:
             _skriv_i_dokument(konfig, u)
             dok["skrivna"] = [s for s in dok["skrivna"] if not s.startswith(u["id"])] + [f"{u['id']}:{status}"]
+            _registrera_tecken(dok, u)
         except Exception as e:
             problem.append(f"Kunde inte skriva i dokumentet ({str(e)[:150]}).")
 
@@ -398,6 +430,10 @@ def kontrollera(webblasare):
         _spara(SAMMANFATTNINGAR, {k: v for k, v in cache.items() if k in aktuella})
         dok["skrivna"] = dok["skrivna"][-500:]
         _spara(DOKUMENT_TILLSTAND, dok)
+
+    varning = _dokumentvarning(dok)
+    if varning:
+        fynd.append(varning)  # står kvar i listan, så notisen kommer en gång per gräns
 
     if problem:
         # Ett id per dag ger högst en varning per dygn; nästa körning försöker igen.
@@ -450,6 +486,7 @@ def _main():
             _skriv_i_dokument(konfig, u)
             status = "full" if u.get("sammanfattning") else "kort"
             dok["skrivna"] = [s for s in dok["skrivna"] if not s.startswith(u["id"])] + [f"{u['id']}:{status}"]
+            _registrera_tecken(dok, u)
             _spara(SAMMANFATTNINGAR, cache)
             _spara(DOKUMENT_TILLSTAND, dok)
             print("klar" if u.get("sammanfattning") else f"skrevs med HD:s korta sammanfattning. {u.get('fel', '')}")
