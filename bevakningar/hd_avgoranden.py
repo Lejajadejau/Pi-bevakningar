@@ -6,21 +6,29 @@ publiceringar från HD där typ = PREJUDIKAT. Prövningstillstånd (typ
 PROVNINGSTILLSTAND) och senare NJA-referat av redan rapporterade avgöranden
 (publiceringsform REFERAT) hoppas över.
 
-Varje nytt avgörande
-  1. ger en ntfy-notis med målnummer, benämning och HD:s sammanfattning, och
-  2. skrivs in i Google-dokumentet "Claude HD-bevakning", om dokumentkopplingen
-     är inställd (nycklarna hd_dokument_url och hd_dokument_nyckel i
-     config.local.json, se README). Saknas kopplingen kommer bara notisen.
+För varje nytt avgörande hämtas hela avgörandet (PDF) och sammanfattas av
+Gemini (Googles API, nyckeln gemini_nyckel i config.local.json). Sedan
+  1. kommer en ntfy-notis med en kort sammanfattning, och
+  2. skrivs hela sammanfattningen in överst i Google-dokumentet
+     "Claude HD-bevakning" (nycklarna hd_dokument_url och hd_dokument_nyckel).
+Utan Gemini-nyckel används HD:s egen korta sammanfattning.
 
-Kan också köras fristående för att testa:
-  ./venv/bin/python bevakningar/hd_avgoranden.py --senaste     visar de tre senaste avgörandena
-  ./venv/bin/python bevakningar/hd_avgoranden.py --provskriv   skriver det senaste i dokumentet
+Fristående kommandon:
+  ./venv/bin/python bevakningar/hd_avgoranden.py --senaste
+        visar de tre senaste avgörandena med HD:s egna sammanfattningar
+  ./venv/bin/python bevakningar/hd_avgoranden.py --testa
+        sammanfattar det senaste avgörandet med Gemini och skriver ut resultatet
+  ./venv/bin/python bevakningar/hd_avgoranden.py --fyll-pa 2026-09-01
+        skriver in alla avgöranden sedan datumet i dokumentet (inga notiser).
+        Ett avgörande som redan står i dokumentet ersätts.
 """
 
+import base64
 import datetime as dt
 import json
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -34,14 +42,49 @@ BEHOVER_WEBBLASARE = False
 # så att det inte kommer en klump gamla avgöranden vid första körningen.
 STARTTID = "2026-10-02T00:00:00"
 
-API = "https://rattspraxis.etjanst.domstol.se/api/v1/publiceringar"
-LANK = "https://rattspraxis.etjanst.domstol.se/sok/publicering/{id}"
+BAS = "https://rattspraxis.etjanst.domstol.se"
+API = BAS + "/api/v1/publiceringar"
+PDF = BAS + "/api/v1/bilagor/{fil}"
+LANK = BAS + "/sok/publicering/{id}"
+DOKUMENT_LANK = "https://docs.google.com/document/d/1BfICoZw3f6HjhouSF0TIlvYgds7u2V0wIp_z_RRclHs/edit"
+
+GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/{modell}:generateContent"
+# Provas i tur och ordning om ingen modell anges i config.local.json (gemini_modell).
+GEMINI_MODELLER = ["gemini-pro-latest", "gemini-2.5-pro", "gemini-flash-latest", "gemini-2.5-flash"]
 
 ROT = Path(__file__).resolve().parent.parent
 KONFIG = ROT / "config.local.json"
 DOKUMENT_TILLSTAND = ROT / "state" / "hd_dokument.json"
+SAMMANFATTNINGAR = ROT / "state" / "hd_sammanfattningar.json"
 
 MANADER = ["jan", "feb", "mars", "april", "maj", "juni", "juli", "aug", "sep", "okt", "nov", "dec"]
+
+INSTRUKTION = """Du är en erfaren svensk jurist. Bifogat är ett avgörande från Högsta domstolen.
+Skriv en sammanfattning för en hovrättsdomare som vill förstå avgörandet ordentligt utan att läsa det.
+
+Svara ENBART med ett JSON-objekt med följande nycklar (alla värden är strängar):
+- "kort": 2–3 meningar: vilken rättsfråga HD prövade, hur HD besvarade den och utgången.
+- "fraga": rättsfrågan eller rättsfrågorna som HD prövade och varför de hade prejudikatintresse.
+- "bakgrund": kortfattat om omständigheterna och hur underinstanserna bedömde saken.
+- "bedomning": HD:s bärande skäl i den ordning HD resonerar. Ange de lagrum, förarbeten och
+  rättsfall som HD bygger på och hänvisa till punkter i avgörandet (t.ex. "p. 14").
+  Detta är huvuddelen, normalt 200–450 ord. Dela upp i stycken med en tom rad emellan.
+- "utgang": domslutet eller beslutet.
+- "betydelse": vad avgörandet innebär för rättstillämpningen, t.ex. om praxis klargörs,
+  ändras eller utvecklas.
+- "skiljaktiga": skiljaktiga meningar eller tillägg, med kort vad de ansåg; tom sträng om inga finns.
+
+Skriv på saklig juridisk svenska utan punktlistor. Skriv "fått laga kraft", aldrig
+"vunnit laga kraft". Lägg inte till något som inte framgår av avgörandet; om något
+inte framgår, säg det."""
+
+
+# --- Hämta från domstolens API --------------------------------------------------
+
+def _hamta(url, timeout=60):
+    req = urllib.request.Request(url, headers={"User-Agent": "pi-bevakningar"})
+    with urllib.request.urlopen(req, timeout=timeout) as svar:
+        return svar.read()
 
 
 def _hamta_publiceringar(antal=100):
@@ -51,12 +94,7 @@ def _hamta_publiceringar(antal=100):
         "sortorder": "publiceringstid",
         "asc": "false",
     })
-    req = urllib.request.Request(
-        f"{API}?{parametrar}",
-        headers={"Accept": "application/json", "User-Agent": "pi-bevakningar"},
-    )
-    with urllib.request.urlopen(req, timeout=60) as svar:
-        data = json.loads(svar.read().decode("utf-8"))
+    data = json.loads(_hamta(f"{API}?{parametrar}").decode("utf-8"))
     if isinstance(data, dict):  # tål om API:et skulle börja svara med ett omslag
         data = data.get("publiceringLista") or data.get("content") or []
     return data
@@ -80,32 +118,26 @@ def _datum(iso):
 
 def _uppgifter(p):
     benamning = (p.get("benamning") or "").strip().strip('"”“').strip()
+    pdf = None
+    for b in p.get("bilagaLista") or []:
+        if b.get("fillagringId") and (b.get("filnamn") or "").lower().endswith(".pdf"):
+            pdf = PDF.format(fil=urllib.parse.quote(b["fillagringId"], safe=""))
+            break
     return {
         "id": p["id"],
         "malnummer": ", ".join(p.get("malNummerLista") or []) or "okänt målnummer",
         "benamning": benamning,
         "avgorandedatum": _datum(p.get("avgorandedatum")),
         "publicerat": (p.get("publiceringstid") or "").replace("T", " ")[:16],
-        "sammanfattning": (p.get("sammanfattning") or "").strip(),
+        "hd_sammanfattning": (p.get("sammanfattning") or "").strip(),
         "nyckelord": p.get("nyckelordLista") or [],
         "lagrum": [l.get("referens", "") for l in (p.get("lagrumLista") or []) if l.get("referens")],
         "lank": LANK.format(id=p["id"]),
+        "pdf": pdf,
     }
 
 
-def _notistext(u):
-    rubrik = u["malnummer"] + (f" ”{u['benamning']}”" if u["benamning"] else "")
-    sammanfattning = u["sammanfattning"] or "(HD har inte lagt in någon sammanfattning.)"
-    if len(sammanfattning) > 700:
-        sammanfattning = sammanfattning[:700].rsplit(" ", 1)[0] + " …"
-    rader = [rubrik, sammanfattning]
-    if u["nyckelord"]:
-        rader.append("Nyckelord: " + ", ".join(u["nyckelord"]))
-    rader.append(f"Avgjort {u['avgorandedatum']}.\n")
-    return "\n".join(rader)
-
-
-# --- Google-dokumentet -------------------------------------------------------
+# --- Konfiguration och tillstånd -----------------------------------------------
 
 def _konfig():
     try:
@@ -114,24 +146,144 @@ def _konfig():
         return {}
 
 
-def _las_dokumenttillstand():
+def _las(sokvag, standard):
     try:
-        return json.loads(DOKUMENT_TILLSTAND.read_text(encoding="utf-8"))
+        return json.loads(sokvag.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return {"skrivna": [], "vantar": {}}
+        return standard
 
 
-def _spara_dokumenttillstand(t):
-    DOKUMENT_TILLSTAND.parent.mkdir(exist_ok=True)
-    t["skrivna"] = t["skrivna"][-500:]
-    tmp = DOKUMENT_TILLSTAND.with_suffix(".tmp")
-    tmp.write_text(json.dumps(t, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(DOKUMENT_TILLSTAND)
+def _spara(sokvag, data):
+    sokvag.parent.mkdir(exist_ok=True)
+    tmp = sokvag.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(sokvag)
+
+
+# --- Sammanfattning med Gemini -----------------------------------------------------
+
+def _gemini(konfig, pdf_data):
+    nyckel = konfig["gemini_nyckel"]
+    modeller = [konfig["gemini_modell"]] if konfig.get("gemini_modell") else GEMINI_MODELLER
+    kropp = json.dumps({
+        "contents": [{"parts": [
+            {"inline_data": {"mime_type": "application/pdf",
+                             "data": base64.b64encode(pdf_data).decode("ascii")}},
+            {"text": INSTRUKTION},
+        ]}],
+        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.2},
+    }).encode("utf-8")
+
+    senaste_fel = None
+    for modell in modeller:
+        req = urllib.request.Request(
+            GEMINI.format(modell=modell), data=kropp, method="POST",
+            headers={"Content-Type": "application/json", "x-goog-api-key": nyckel},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=300) as svar:
+                data = json.loads(svar.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            text = e.read().decode("utf-8", "replace")[:300]
+            senaste_fel = f"Gemini ({modell}) svarade {e.code}: {text}"
+            if e.code == 404:  # modellen finns inte – prova nästa
+                continue
+            raise RuntimeError(senaste_fel)
+        delar = data["candidates"][0]["content"]["parts"]
+        text = "".join(d.get("text", "") for d in delar if not d.get("thought"))
+        text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        resultat = json.loads(text)
+        resultat["modell"] = modell
+        return resultat
+    raise RuntimeError(senaste_fel or "ingen Gemini-modell att prova")
+
+
+def _sammanfatta(konfig, u, forsok=3):
+    """Returnerar Geminis sammanfattning (dict) eller kastar fel."""
+    if not u["pdf"]:
+        raise RuntimeError("avgörandet saknar PDF i Sök rättspraxis")
+    pdf_data = _hamta(u["pdf"], timeout=120)
+    for i in range(forsok):
+        try:
+            return _gemini(konfig, pdf_data)
+        except Exception:
+            if i == forsok - 1:
+                raise
+            time.sleep(30 * (i + 1))
+
+
+def _med_sammanfattning(konfig, u, cache):
+    """Lägger till sammanfattning i u. Använder cache så att Gemini bara anropas en gång."""
+    if u["id"] in cache:
+        u["sammanfattning"] = cache[u["id"]]
+        return u
+    if not konfig.get("gemini_nyckel"):
+        u["sammanfattning"] = None
+        return u
+    try:
+        u["sammanfattning"] = _sammanfatta(konfig, u)
+    except Exception as e:
+        u["sammanfattning"] = None
+        u["fel"] = f"Den automatiska sammanfattningen misslyckades ({str(e)[:150]})."
+        return u  # cachas inte – nästa körning försöker igen
+    cache[u["id"]] = u["sammanfattning"]
+    return u
+
+
+# --- Notis och dokument -----------------------------------------------------------
+
+def _rubrik(u):
+    return u["malnummer"] + (f" – ”{u['benamning']}”" if u["benamning"] else "")
+
+
+def _notistext(u):
+    s = u.get("sammanfattning")
+    if s and s.get("kort"):
+        text = s["kort"].strip()
+        tillagg = "Hela sammanfattningen finns i dokumentet Claude HD-bevakning."
+    else:
+        text = u["hd_sammanfattning"] or "(HD har inte lagt in någon sammanfattning.)"
+        tillagg = u.get("fel") or ""
+    if len(text) > 900:
+        text = text[:900].rsplit(" ", 1)[0] + " …"
+    rader = [_rubrik(u), text]
+    if tillagg:
+        rader.append(tillagg)
+    rader.append(f"Avgjort {u['avgorandedatum']}.\n")
+    return "\n".join(rader)
+
+
+def _block(u):
+    """Posten i dokumentet, som en lista block som Apps Script-kopplingen ritar upp."""
+    b = [{"typ": "rubrik", "text": _rubrik(u)}]
+    meta = f"Avgjort {u['avgorandedatum']} · publicerat {u['publicerat']}"
+    if u["nyckelord"]:
+        meta += " · " + ", ".join(u["nyckelord"])
+    b.append({"typ": "meta", "text": meta})
+    s = u.get("sammanfattning")
+    if s:
+        for nyckel, etikett in [("kort", "I korthet"), ("fraga", "Frågan"), ("bakgrund", "Bakgrund"),
+                                ("bedomning", "HD:s bedömning"), ("utgang", "Utgång"),
+                                ("betydelse", "Betydelse"), ("skiljaktiga", "Skiljaktiga och tillägg")]:
+            text = (s.get(nyckel) or "").strip()
+            if text:
+                b.append({"typ": "avsnitt", "etikett": etikett, "text": text})
+        b.append({"typ": "meta", "text": f"HD:s egen sammanfattning: {u['hd_sammanfattning']}"})
+    else:
+        b.append({"typ": "text", "text": u["hd_sammanfattning"] or "(HD har inte lagt in någon sammanfattning.)"})
+        if u.get("fel"):
+            b.append({"typ": "meta", "text": u["fel"]})
+    if u["lagrum"]:
+        b.append({"typ": "meta", "text": "Lagrum: " + "; ".join(u["lagrum"])})
+    if u["pdf"]:
+        b.append({"typ": "lank", "text": "Avgörandet (PDF)", "url": u["pdf"]})
+    b.append({"typ": "lank", "text": "Öppna i Sök rättspraxis", "url": u["lank"]})
+    return b
 
 
 def _skriv_i_dokument(konfig, u):
     """Skickar ett avgörande till Apps Script-kopplingen i dokumentet."""
-    data = dict(u, nyckel=konfig["hd_dokument_nyckel"])
+    data = {"nyckel": konfig["hd_dokument_nyckel"], "malnummer": u["malnummer"], "block": _block(u)}
     req = urllib.request.Request(
         konfig["hd_dokument_url"],
         data=json.dumps(data, ensure_ascii=False).encode("utf-8"),
@@ -145,70 +297,111 @@ def _skriv_i_dokument(konfig, u):
         raise RuntimeError(f"dokumentet svarade: {text[:200]}")
 
 
-def _uppdatera_dokument(avgoranden, test):
-    """Skriver nya avgöranden i dokumentet. Returnerar ev. feltext."""
-    konfig = _konfig()
-    if not (konfig.get("hd_dokument_url") and konfig.get("hd_dokument_nyckel")):
-        return None  # dokumentkopplingen är inte inställd – bara notiser
-    if test:
-        return None  # testkörningar skriver inte i dokumentet
-
-    t = _las_dokumenttillstand()
-    skrivna = set(t["skrivna"])
-    for u in avgoranden:
-        if u["id"] not in skrivna and u["id"] not in t["vantar"]:
-            t["vantar"][u["id"]] = u
-
-    fel = None
-    # Äldst först, så att dokumentet får rätt ordning (nyast hamnar överst).
-    for id_, u in sorted(t["vantar"].items(), key=lambda kv: kv[1]["publicerat"]):
-        try:
-            _skriv_i_dokument(konfig, u)
-        except Exception as e:
-            fel = str(e)[:200]
-            break
-        t["skrivna"].append(id_)
-        del t["vantar"][id_]
-    _spara_dokumenttillstand(t)
-    return fel
+def _dokument_installt(konfig):
+    return bool(konfig.get("hd_dokument_url") and konfig.get("hd_dokument_nyckel"))
 
 
-# --- Bevakningen ---------------------------------------------------------------
+# --- Bevakningen -----------------------------------------------------------------
 
 def kontrollera(webblasare):
     test = "--test" in sys.argv
+    konfig = _konfig()
+    cache = _las(SAMMANFATTNINGAR, {})
+    dok = _las(DOKUMENT_TILLSTAND, {"skrivna": [], "vantar": {}})
+    dok.pop("vantar", None)  # äldre format
+
     avgoranden = [
         _uppgifter(p)
         for p in _hamta_publiceringar()
         if _ar_avgorande(p) and (p.get("publiceringstid") or "") >= STARTTID
     ]
+    avgoranden.sort(key=lambda u: u["publicerat"])  # äldst först – nyast hamnar överst i dokumentet
 
-    fynd = [{"id": u["id"], "text": _notistext(u), "url": u["lank"]} for u in avgoranden]
+    fynd, problem = [], []
+    for u in avgoranden:
+        _med_sammanfattning(konfig, u, cache)
+        if u.get("fel") and u["pdf"]:  # saknad PDF är inget fel att varna för varje dag
+            problem.append(u["fel"])
+        fynd.append({"id": u["id"], "text": _notistext(u), "url": DOKUMENT_LANK if u.get("sammanfattning") else u["lank"]})
 
-    fel = _uppdatera_dokument(avgoranden, test)
-    if fel:
+        if test or not _dokument_installt(konfig):
+            continue
+        # Skrivs om när den riktiga sammanfattningen kommit, om förra försöket fick nöja sig med HD:s.
+        status = "full" if u.get("sammanfattning") else "kort"
+        tidigare = {s.split(":")[0]: s for s in dok["skrivna"]}.get(u["id"])
+        if tidigare in (f"{u['id']}:full",) or (tidigare == f"{u['id']}:kort" and status == "kort"):
+            continue
+        try:
+            _skriv_i_dokument(konfig, u)
+            dok["skrivna"] = [s for s in dok["skrivna"] if not s.startswith(u["id"])] + [f"{u['id']}:{status}"]
+        except Exception as e:
+            problem.append(f"Kunde inte skriva i dokumentet ({str(e)[:150]}).")
+
+    if not test:
+        # Spara bara sammanfattningar för avgöranden som fortfarande finns i listan.
+        aktuella = {u["id"] for u in avgoranden}
+        _spara(SAMMANFATTNINGAR, {k: v for k, v in cache.items() if k in aktuella})
+        dok["skrivna"] = dok["skrivna"][-500:]
+        _spara(DOKUMENT_TILLSTAND, dok)
+
+    if problem:
         # Ett id per dag ger högst en varning per dygn; nästa körning försöker igen.
         fynd.append({
-            "id": "dokumentfel-" + time.strftime("%Y-%m-%d"),
-            "text": f"⚠️ Kunde inte skriva i dokumentet Claude HD-bevakning ({fel}). Försöker igen.",
+            "id": "hd-problem-" + time.strftime("%Y-%m-%d"),
+            "text": "⚠️ " + " ".join(dict.fromkeys(problem)) + " Försöker igen vid nästa körning.",
         })
     return fynd
 
 
+# --- Fristående kommandon -----------------------------------------------------------
+
 def _main():
-    senaste = [_uppgifter(p) for p in _hamta_publiceringar() if _ar_avgorande(p)]
-    if not senaste:
+    konfig = _konfig()
+    alla = [_uppgifter(p) for p in _hamta_publiceringar() if _ar_avgorande(p)]
+    if not alla:
         print("Hittade inga avgöranden från HD i API:et.")
         return
-    if "--provskriv" in sys.argv:
-        konfig = _konfig()
-        if not konfig.get("hd_dokument_url"):
-            print("hd_dokument_url saknas i config.local.json – se README.")
+
+    if "--testa" in sys.argv:
+        if not konfig.get("gemini_nyckel"):
+            print("gemini_nyckel saknas i config.local.json – se README.")
             sys.exit(1)
-        _skriv_i_dokument(konfig, senaste[0])
-        print(f"Skrev {senaste[0]['malnummer']} i dokumentet. Titta i Google Docs.")
+        u = alla[0]
+        print(f"Sammanfattar {u['malnummer']} … (kan ta en minut)")
+        s = _sammanfatta(konfig, u, forsok=1)
+        print(f"[modell: {s.pop('modell', '?')}]\n")
+        for nyckel, varde in s.items():
+            print(f"== {nyckel} ==\n{varde}\n")
         return
-    for u in senaste[:3]:
+
+    if "--fyll-pa" in sys.argv:
+        try:
+            fran = sys.argv[sys.argv.index("--fyll-pa") + 1]
+            dt.date.fromisoformat(fran)
+        except (IndexError, ValueError):
+            print("Ange datum, t.ex.: --fyll-pa 2026-09-01")
+            sys.exit(1)
+        if not _dokument_installt(konfig):
+            print("hd_dokument_url eller hd_dokument_nyckel saknas i config.local.json – se README.")
+            sys.exit(1)
+        valda = sorted((u for u in alla if u["publicerat"][:10] >= fran), key=lambda u: u["publicerat"])
+        print(f"{len(valda)} avgöranden sedan {fran}.")
+        cache = _las(SAMMANFATTNINGAR, {})
+        dok = _las(DOKUMENT_TILLSTAND, {"skrivna": []})
+        dok.pop("vantar", None)
+        for u in valda:
+            print(f"  {u['malnummer']} …", end=" ", flush=True)
+            _med_sammanfattning(konfig, u, cache)
+            _skriv_i_dokument(konfig, u)
+            status = "full" if u.get("sammanfattning") else "kort"
+            dok["skrivna"] = [s for s in dok["skrivna"] if not s.startswith(u["id"])] + [f"{u['id']}:{status}"]
+            _spara(SAMMANFATTNINGAR, cache)
+            _spara(DOKUMENT_TILLSTAND, dok)
+            print("klar" if u.get("sammanfattning") else f"skrevs med HD:s korta sammanfattning. {u.get('fel', '')}")
+        print("Klart. Titta i Google Docs.")
+        return
+
+    for u in alla[:3]:
         print(_notistext(u))
         print(u["lank"])
         print("-" * 60)

@@ -91,25 +91,31 @@ Om en bevakning går fel skickas högst en varningsnotis per dygn.
 
 `bevakningar/hd_avgoranden.py` kollar en gång per dygn domstolarnas öppna API
 (Sök rättspraxis) efter nya avgöranden från Högsta domstolen. Bara prejudikat
-räknas – prövningstillstånd och senare NJA-referat hoppas över. Varje nytt
-avgörande ger en notis med HD:s egen sammanfattning och skrivs in överst i
-Google-dokumentet *Claude HD-bevakning*.
+räknas – prövningstillstånd och senare NJA-referat hoppas över.
 
-Dokumentkopplingen är ett litet Apps Script i dokumentet (`google/hd_dokument.gs`)
-som Pi:n skickar avgörandena till. Inställningar på Pi:n, i `config.local.json`:
+För varje nytt avgörande hämtas hela avgörandet som PDF och sammanfattas av
+Googles Gemini (fråga, bakgrund, HD:s bedömning, utgång, betydelse, skiljaktiga).
+Notisen får en kort sammanfattning och hela sammanfattningen skrivs in överst i
+Google-dokumentet *Claude HD-bevakning* via ett litet Apps Script i dokumentet
+(`google/hd_dokument.gs`). Gemini anropas bara en gång per avgörande.
+
+Inställningar på Pi:n, i `config.local.json`:
 
 ```json
-"hd_dokument_url": "webbapp-adressen från Apps Script",
-"hd_dokument_nyckel": "samma hemliga nyckel som i skriptet"
+"hd_dokument_url": "webbapp-adressen från Apps Script (slutar med /exec)",
+"hd_dokument_nyckel": "samma hemliga nyckel som i skriptet",
+"gemini_nyckel": "API-nyckel från aistudio.google.com",
+"gemini_modell": "valfritt, t.ex. gemini-2.5-pro"
 ```
 
-Saknas de kommer bara notiserna. Om dokumentet inte går att skriva till
-försöker Pi:n igen vid varje körning och varnar högst en gång per dygn.
+Utan Gemini-nyckel används HD:s egen korta sammanfattning. Om något går fel
+kommer notisen ändå, Pi:n försöker igen nästa dygn och varnar högst en gång per dygn.
 
 | Vad | Kommando |
 |---|---|
 | Visa de tre senaste HD-avgörandena | `./venv/bin/python bevakningar/hd_avgoranden.py --senaste` |
-| Provskriv det senaste i dokumentet | `./venv/bin/python bevakningar/hd_avgoranden.py --provskriv` |
+| Prova Gemini-sammanfattning av det senaste | `./venv/bin/python bevakningar/hd_avgoranden.py --testa` |
+| Fyll på dokumentet med alla avgöranden sedan ett datum | `./venv/bin/python bevakningar/hd_avgoranden.py --fyll-pa 2026-09-01` |
 
 ## Principer
 
