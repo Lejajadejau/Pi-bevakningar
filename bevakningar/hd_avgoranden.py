@@ -187,7 +187,7 @@ def _claude(konfig, pdf_data):
     }).encode("utf-8")
     req = urllib.request.Request(
         CLAUDE, data=kropp, method="POST",
-        headers={"Content-Type": "application/json", "x-api-key": konfig["claude_nyckel"],
+        headers={"Content-Type": "application/json", "x-api-key": konfig["claude_nyckel"].strip(),
                  "anthropic-version": "2023-06-01"},
     )
     try:
