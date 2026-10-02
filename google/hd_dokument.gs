@@ -31,7 +31,7 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
-  return svar('ok');
+  return svar('ok:2');
 }
 
 function svar(text) {

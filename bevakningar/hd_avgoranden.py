@@ -345,7 +345,10 @@ def _skriv_i_dokument(konfig, u):
     # Google svarar med en omdirigering som urllib följer med GET – det är meningen.
     with urllib.request.urlopen(req, timeout=60) as svar:
         text = svar.read().decode("utf-8", "replace").strip()
-    if text != "ok":
+    if text == "ok":
+        raise RuntimeError("koden i dokumentets Apps Script är den gamla – byt koden och "
+                           "implementera en ny version (Hantera implementeringar → Ny version)")
+    if text != "ok:2":
         raise RuntimeError(f"dokumentet svarade: {text[:200]}")
 
 
