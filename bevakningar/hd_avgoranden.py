@@ -64,25 +64,24 @@ SAMMANFATTNINGAR = ROT / "state" / "hd_sammanfattningar.json"
 MANADER = ["jan", "feb", "mars", "april", "maj", "juni", "juli", "aug", "sep", "okt", "nov", "dec"]
 
 INSTRUKTION = """Du är en erfaren svensk jurist. Bifogat är ett avgörande från Högsta domstolen.
-Skriv en koncis sammanfattning för en hovrättsdomare som snabbt vill veta vad HD kom fram till
-och varför. Hela sammanfattningen ska rymmas på ungefär en halv A4-sida (högst cirka 350 ord).
+Skriv en sammanfattning för en hovrättsdomare som vill förstå avgörandet ordentligt utan att läsa det.
 
 Svara ENBART med ett JSON-objekt med följande nycklar (alla värden är strängar, alla nycklar ska finnas):
-- "kort": 2–3 meningar: rättsfrågan, HD:s svar och utgången.
-- "fraga": rättsfrågan som HD prövade, i 1–3 meningar.
-- "bakgrund": det allra nödvändigaste om omständigheterna, i högst 2–3 meningar.
-  Inga detaljer om brotten utöver vad som behövs för att förstå rättsfrågan.
-- "bedomning": HD:s bärande skäl i 1–2 stycken, högst cirka 180 ord. Ta bara med det som bär
-  avgörandet. Hänvisa till punkter i avgörandet (t.ex. "p. 14") och till de viktigaste
-  lagrummen och rättsfallen, men räkna inte upp allt HD citerar.
-- "utgang": domslutet i 1–2 meningar. Utelämna rättegångskostnader, ersättning till
+- "kort": 2–3 meningar: vilken rättsfråga HD prövade, hur HD besvarade den och utgången.
+- "fraga": rättsfrågan eller rättsfrågorna som HD prövade och varför de hade prejudikatintresse.
+- "bakgrund": kortfattat om omständigheterna och hur underinstanserna bedömde saken.
+- "bedomning": HD:s bärande skäl i den ordning HD resonerar. Ange de lagrum, förarbeten och
+  rättsfall som HD bygger på och hänvisa till punkter i avgörandet (t.ex. "p. 14").
+  Detta är huvuddelen. Dela upp i stycken med en tom rad emellan.
+- "utgang": domslutet eller beslutet. Utelämna rättegångskostnader, ersättning till
   försvarare och liknande om de inte är en del av rättsfrågan.
-- "betydelse": i 1–2 meningar, vad avgörandet innebär för rättstillämpningen.
-- "skiljaktiga": skiljaktiga meningar eller tillägg i en mening; tom sträng om inga finns.
+- "betydelse": vad avgörandet innebär för rättstillämpningen, t.ex. om praxis klargörs,
+  ändras eller utvecklas.
+- "skiljaktiga": skiljaktiga meningar eller tillägg, med kort vad de ansåg; tom sträng om inga finns.
 
 Skriv på saklig juridisk svenska utan punktlistor och utan kommentarer om vad avgörandet
-inte anger. Skriv "fått laga kraft", aldrig "vunnit laga kraft". Lägg inte till något som
-inte framgår av avgörandet."""
+inte anger. Skriv "fått laga kraft", aldrig "vunnit laga kraft". Lägg inte till något
+som inte framgår av avgörandet."""
 
 
 # --- Hämta från domstolens API --------------------------------------------------
@@ -180,7 +179,7 @@ def _claude(konfig, pdf_data):
     modell = konfig.get("claude_modell") or CLAUDE_MODELL
     kropp = json.dumps({
         "model": modell,
-        "max_tokens": 8000,
+        "max_tokens": 16000,
         "messages": [{"role": "user", "content": [
             {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
                                              "data": base64.b64encode(pdf_data).decode("ascii")}},
