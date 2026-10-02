@@ -198,6 +198,9 @@ def _claude(konfig, pdf_data):
         with urllib.request.urlopen(req, timeout=300) as svar:
             data = json.loads(svar.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
+        if e.code == 401:
+            raise RuntimeError("Claude-nyckeln godtas inte längre – den har troligen gått ut. "
+                               "Skapa en ny på platform.claude.com/settings/keys och lägg in den på Pi:n")
         raise RuntimeError(f"Claude ({modell}) svarade {e.code}: {e.read().decode('utf-8', 'replace')[:300]}")
     text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
     resultat = _tolka_json(text)
