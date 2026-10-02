@@ -178,7 +178,7 @@ def _claude(konfig, pdf_data):
     modell = konfig.get("claude_modell") or CLAUDE_MODELL
     kropp = json.dumps({
         "model": modell,
-        "max_tokens": 4000,
+        "max_tokens": 16000,
         "messages": [{"role": "user", "content": [
             {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
                                              "data": base64.b64encode(pdf_data).decode("ascii")}},
@@ -203,6 +203,8 @@ def _claude(konfig, pdf_data):
                                "Skapa en ny på platform.claude.com/settings/keys och lägg in den på Pi:n")
         raise RuntimeError(f"Claude ({modell}) svarade {e.code}: {e.read().decode('utf-8', 'replace')[:300]}")
     text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+    if data.get("stop_reason") == "max_tokens":
+        raise RuntimeError("svaret från Claude blev för långt och klipptes av")
     resultat = _tolka_json(text)
     resultat["modell"] = modell
     return resultat
