@@ -94,27 +94,27 @@ Om en bevakning går fel skickas högst en varningsnotis per dygn.
 räknas – prövningstillstånd och senare NJA-referat hoppas över.
 
 För varje nytt avgörande hämtas hela avgörandet som PDF och sammanfattas av
-Googles Gemini (fråga, bakgrund, HD:s bedömning, utgång, betydelse, skiljaktiga).
+Claude via Anthropics API (eller Googles Gemini om bara en Gemini-nyckel finns) (fråga, bakgrund, HD:s bedömning, utgång, betydelse, skiljaktiga).
 Notisen får en kort sammanfattning och hela sammanfattningen skrivs in överst i
 Google-dokumentet *Claude HD-bevakning* via ett litet Apps Script i dokumentet
-(`google/hd_dokument.gs`). Gemini anropas bara en gång per avgörande.
+(`google/hd_dokument.gs`). Varje avgörande sammanfattas bara en gång.
 
 Inställningar på Pi:n, i `config.local.json`:
 
 ```json
 "hd_dokument_url": "webbapp-adressen från Apps Script (slutar med /exec)",
 "hd_dokument_nyckel": "samma hemliga nyckel som i skriptet",
-"gemini_nyckel": "API-nyckel från aistudio.google.com",
-"gemini_modell": "valfritt, t.ex. gemini-2.5-pro"
+"claude_nyckel": "API-nyckel från platform.claude.com (börjar med sk-ant-)",
+"claude_modell": "valfritt, standard claude-opus-5-5"
 ```
 
-Utan Gemini-nyckel används HD:s egen korta sammanfattning. Om något går fel
+Utan nyckel används HD:s egen korta sammanfattning. Om något går fel
 kommer notisen ändå, Pi:n försöker igen nästa dygn och varnar högst en gång per dygn.
 
 | Vad | Kommando |
 |---|---|
 | Visa de tre senaste HD-avgörandena | `./venv/bin/python bevakningar/hd_avgoranden.py --senaste` |
-| Prova Gemini-sammanfattning av det senaste | `./venv/bin/python bevakningar/hd_avgoranden.py --testa` |
+| Prova sammanfattning av det senaste | `./venv/bin/python bevakningar/hd_avgoranden.py --testa` |
 | Fyll på dokumentet med alla avgöranden sedan ett datum | `./venv/bin/python bevakningar/hd_avgoranden.py --fyll-pa 2026-09-01` |
 
 ## Principer

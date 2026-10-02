@@ -7,17 +7,18 @@ PROVNINGSTILLSTAND) och senare NJA-referat av redan rapporterade avgöranden
 (publiceringsform REFERAT) hoppas över.
 
 För varje nytt avgörande hämtas hela avgörandet (PDF) och sammanfattas av
-Gemini (Googles API, nyckeln gemini_nyckel i config.local.json). Sedan
+Claude (Anthropics API, nyckeln claude_nyckel i config.local.json) eller, om
+den saknas, av Gemini (gemini_nyckel). Sedan
   1. kommer en ntfy-notis med en kort sammanfattning, och
   2. skrivs hela sammanfattningen in överst i Google-dokumentet
      "Claude HD-bevakning" (nycklarna hd_dokument_url och hd_dokument_nyckel).
-Utan Gemini-nyckel används HD:s egen korta sammanfattning.
+Utan nyckel används HD:s egen korta sammanfattning.
 
 Fristående kommandon:
   ./venv/bin/python bevakningar/hd_avgoranden.py --senaste
         visar de tre senaste avgörandena med HD:s egna sammanfattningar
   ./venv/bin/python bevakningar/hd_avgoranden.py --testa
-        sammanfattar det senaste avgörandet med Gemini och skriver ut resultatet
+        sammanfattar det senaste avgörandet och skriver ut resultatet
   ./venv/bin/python bevakningar/hd_avgoranden.py --fyll-pa 2026-09-01
         skriver in alla avgöranden sedan datumet i dokumentet (inga notiser).
         Ett avgörande som redan står i dokumentet ersätts.
@@ -47,6 +48,9 @@ API = BAS + "/api/v1/publiceringar"
 PDF = BAS + "/api/v1/bilagor/{fil}"
 LANK = BAS + "/sok/publicering/{id}"
 DOKUMENT_LANK = "https://docs.google.com/document/d/1BfICoZw3f6HjhouSF0TIlvYgds7u2V0wIp_z_RRclHs/edit"
+
+CLAUDE = "https://api.anthropic.com/v1/messages"
+CLAUDE_MODELL = "claude-opus-5-5"  # kan ändras med claude_modell i config.local.json
 
 GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/{modell}:generateContent"
 # Provas i tur och ordning om ingen modell anges i config.local.json (gemini_modell).
@@ -160,7 +164,42 @@ def _spara(sokvag, data):
     tmp.replace(sokvag)
 
 
-# --- Sammanfattning med Gemini -----------------------------------------------------
+# --- Sammanfattning med Claude eller Gemini ------------------------------------------
+
+def _tolka_json(text):
+    text = text.strip()
+    start, slut = text.find("{"), text.rfind("}")
+    if start < 0 or slut < start:
+        raise RuntimeError(f"svaret var inte JSON: {text[:200]}")
+    return json.loads(text[start:slut + 1])
+
+
+def _claude(konfig, pdf_data):
+    modell = konfig.get("claude_modell") or CLAUDE_MODELL
+    kropp = json.dumps({
+        "model": modell,
+        "max_tokens": 4000,
+        "messages": [{"role": "user", "content": [
+            {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                             "data": base64.b64encode(pdf_data).decode("ascii")}},
+            {"type": "text", "text": INSTRUKTION},
+        ]}],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        CLAUDE, data=kropp, method="POST",
+        headers={"Content-Type": "application/json", "x-api-key": konfig["claude_nyckel"],
+                 "anthropic-version": "2023-06-01"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=300) as svar:
+            data = json.loads(svar.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Claude ({modell}) svarade {e.code}: {e.read().decode('utf-8', 'replace')[:300]}")
+    text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+    resultat = _tolka_json(text)
+    resultat["modell"] = modell
+    return resultat
+
 
 def _gemini(konfig, pdf_data):
     nyckel = konfig["gemini_nyckel"]
@@ -191,8 +230,7 @@ def _gemini(konfig, pdf_data):
             raise RuntimeError(senaste_fel)
         delar = data["candidates"][0]["content"]["parts"]
         text = "".join(d.get("text", "") for d in delar if not d.get("thought"))
-        text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        resultat = json.loads(text)
+        resultat = _tolka_json(text)
         resultat["modell"] = modell
         return resultat
     raise RuntimeError(senaste_fel or "ingen Gemini-modell att prova")
@@ -203,9 +241,10 @@ def _sammanfatta(konfig, u, forsok=3):
     if not u["pdf"]:
         raise RuntimeError("avgörandet saknar PDF i Sök rättspraxis")
     pdf_data = _hamta(u["pdf"], timeout=120)
+    motor = _claude if konfig.get("claude_nyckel") else _gemini
     for i in range(forsok):
         try:
-            return _gemini(konfig, pdf_data)
+            return motor(konfig, pdf_data)
         except Exception:
             if i == forsok - 1:
                 raise
@@ -217,7 +256,7 @@ def _med_sammanfattning(konfig, u, cache):
     if u["id"] in cache:
         u["sammanfattning"] = cache[u["id"]]
         return u
-    if not konfig.get("gemini_nyckel"):
+    if not (konfig.get("claude_nyckel") or konfig.get("gemini_nyckel")):
         u["sammanfattning"] = None
         return u
     try:
@@ -363,8 +402,8 @@ def _main():
         return
 
     if "--testa" in sys.argv:
-        if not konfig.get("gemini_nyckel"):
-            print("gemini_nyckel saknas i config.local.json – se README.")
+        if not (konfig.get("claude_nyckel") or konfig.get("gemini_nyckel")):
+            print("claude_nyckel saknas i config.local.json – se README.")
             sys.exit(1)
         u = alla[0]
         print(f"Sammanfattar {u['malnummer']} … (kan ta en minut)")
