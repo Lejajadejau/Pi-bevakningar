@@ -1,0 +1,5 @@
+config.local.json
+state/
+venv/
+__pycache__/
+*.pyc
