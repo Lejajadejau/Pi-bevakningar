@@ -89,7 +89,7 @@ Om en bevakning går fel skickas högst en varningsnotis per dygn.
 
 ## HD-bevakningen och Google-dokumentet
 
-`bevakningar/hd_avgoranden.py` kollar var 15:e minut domstolarnas öppna API
+`bevakningar/hd_avgoranden.py` kollar en gång per dygn domstolarnas öppna API
 (Sök rättspraxis) efter nya avgöranden från Högsta domstolen. Bara prejudikat
 räknas – prövningstillstånd och senare NJA-referat hoppas över. Varje nytt
 avgörande ger en notis med HD:s egen sammanfattning och skrivs in överst i

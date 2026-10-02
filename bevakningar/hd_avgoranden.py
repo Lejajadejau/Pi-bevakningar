@@ -26,7 +26,7 @@ import urllib.request
 from pathlib import Path
 
 NAMN = "HD – nytt avgörande"
-INTERVALL_MINUTER = 15
+INTERVALL_MINUTER = 24 * 60  # en gång per dygn
 AKTIV = True
 BEHOVER_WEBBLASARE = False
 
@@ -44,7 +44,7 @@ DOKUMENT_TILLSTAND = ROT / "state" / "hd_dokument.json"
 MANADER = ["jan", "feb", "mars", "april", "maj", "juni", "juli", "aug", "sep", "okt", "nov", "dec"]
 
 
-def _hamta_publiceringar(antal=40):
+def _hamta_publiceringar(antal=100):
     parametrar = urllib.parse.urlencode({
         "domstolkod": "HDO",
         "pagesize": antal,
