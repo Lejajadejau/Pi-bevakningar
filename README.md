@@ -126,6 +126,17 @@ Pi:n räknar tecknen och skickar en notis vid 80 % och 95 %. Överenskommet: vid
 dokument i samma Drive-mapp (t.ex. "Claude HD-bevakning 2") när det gamla är fullt,
 och Pi:n skickar en notis om att det nya ska läggas till som källa i NotebookLM.
 
+## Helgtips
+
+`bevakningar/helgtips.py` skickar varje lördag cirka kl. 09 en notis med 6–8 helgtips
+för Stockholm i stil med DN På Stan, anpassade efter vädret. Claude söker själv fram
+vad som händer just den helgen (Anthropics API med webbsökning, nyckeln `claude_nyckel`).
+Tipsen sparas också i `state/helgtips/`. Kostnad: några kronor per helg.
+
+| Vad | Kommando |
+|---|---|
+| Ta fram tips för kommande helg nu (ingen notis) | `./venv/bin/python bevakningar/helgtips.py --testa` |
+
 ## Principer
 
 Bevakningarna läser bara. De bokar, köper eller fyller aldrig i något, och de

@@ -166,7 +166,9 @@ def main():
                 if test:
                     print(text)
                 else:
-                    skicka_notis(konfig, namn, text, url=nya[0].get("url"), prioritet="high")
+                    titel = nya[0].get("titel", namn) if len(nya) == 1 else namn
+                    skicka_notis(konfig, titel, text, url=nya[0].get("url"),
+                                 prioritet=getattr(modul, "PRIORITET", "high"))
             spara_tillstand(tillstand)
     finally:
         webblasare.stang()
