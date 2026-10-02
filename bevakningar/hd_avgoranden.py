@@ -185,10 +185,14 @@ def _claude(konfig, pdf_data):
             {"type": "text", "text": INSTRUKTION},
         ]}],
     }).encode("utf-8")
+    # Personliga nycklar (sk-ant-usr-…) skickas som Bearer-token; det fungerar även för äldre nycklar.
+    huvuden = {"Content-Type": "application/json", "anthropic-version": "2023-06-01",
+               "Authorization": "Bearer " + konfig["claude_nyckel"].strip()}
+    if konfig.get("claude_arbetsyta"):  # krävs om nyckeln inte är knuten till en arbetsyta
+        huvuden["anthropic-workspace-id"] = konfig["claude_arbetsyta"].strip()
     req = urllib.request.Request(
         CLAUDE, data=kropp, method="POST",
-        headers={"Content-Type": "application/json", "x-api-key": konfig["claude_nyckel"].strip(),
-                 "anthropic-version": "2023-06-01"},
+        headers=huvuden,
     )
     try:
         with urllib.request.urlopen(req, timeout=300) as svar:

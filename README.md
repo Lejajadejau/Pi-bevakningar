@@ -104,7 +104,8 @@ Inställningar på Pi:n, i `config.local.json`:
 ```json
 "hd_dokument_url": "webbapp-adressen från Apps Script (slutar med /exec)",
 "hd_dokument_nyckel": "samma hemliga nyckel som i skriptet",
-"claude_nyckel": "API-nyckel från platform.claude.com (börjar med sk-ant-)",
+"claude_nyckel": "API-nyckel från platform.claude.com (sk-ant-usr-… eller sk-ant-api…)",
+"claude_arbetsyta": "valfritt, arbetsytans id (wrkspc_…) om nyckeln inte är knuten till en arbetsyta",
 "claude_modell": "valfritt, standard claude-opus-5-5"
 ```
 
