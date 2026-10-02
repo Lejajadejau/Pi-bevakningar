@@ -11,7 +11,7 @@ import re
 
 NAMN = "Washoku Tomo – bord för 4"
 INTERVALL_MINUTER = 30
-AKTIV = True
+AKTIV = False  # pausad 2026-10-02: bord bokat 10 nov
 BEHOVER_WEBBLASARE = True
 
 ANTAL_GASTER = 4
