@@ -68,11 +68,14 @@ Skriv en sammanfattning för en hovrättsdomare som vill förstå avgörandet or
 
 Svara ENBART med ett JSON-objekt med följande nycklar (alla värden är strängar, alla nycklar ska finnas):
 - "kort": 2–3 meningar: vilken rättsfråga HD prövade, hur HD besvarade den och utgången.
-- "fraga": rättsfrågan eller rättsfrågorna som HD prövade och varför de hade prejudikatintresse.
-- "bakgrund": kortfattat om omständigheterna och hur underinstanserna bedömde saken.
+- "fraga": rättsfrågan eller rättsfrågorna som HD prövade, i 2–4 meningar. Föregrip inte
+  HD:s resonemang – det hör hemma under "bedomning".
+- "bakgrund": det nödvändigaste om omständigheterna och hur underinstanserna bedömde saken,
+  i högst 2–3 meningar. Inga detaljer om brotten utöver vad som behövs för att förstå rättsfrågan.
 - "bedomning": HD:s bärande skäl i den ordning HD resonerar. Ange de lagrum, förarbeten och
   rättsfall som HD bygger på och hänvisa till punkter i avgörandet (t.ex. "p. 14").
-  Detta är huvuddelen. Dela upp i stycken med en tom rad emellan.
+  Detta är huvuddelen och ska vara utförlig: ta med varje prejudikatbärande ställningstagande.
+  Dela upp i stycken med en tom rad emellan.
 - "utgang": domslutet eller beslutet. Utelämna rättegångskostnader, ersättning till
   försvarare och liknande om de inte är en del av rättsfrågan.
 - "betydelse": vad avgörandet innebär för rättstillämpningen, t.ex. om praxis klargörs,
