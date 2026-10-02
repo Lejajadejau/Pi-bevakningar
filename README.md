@@ -87,6 +87,30 @@ def kontrollera(webblasare):
 
 Om en bevakning går fel skickas högst en varningsnotis per dygn.
 
+## HD-bevakningen och Google-dokumentet
+
+`bevakningar/hd_avgoranden.py` kollar var 15:e minut domstolarnas öppna API
+(Sök rättspraxis) efter nya avgöranden från Högsta domstolen. Bara prejudikat
+räknas – prövningstillstånd och senare NJA-referat hoppas över. Varje nytt
+avgörande ger en notis med HD:s egen sammanfattning och skrivs in överst i
+Google-dokumentet *Claude HD-bevakning*.
+
+Dokumentkopplingen är ett litet Apps Script i dokumentet (`google/hd_dokument.gs`)
+som Pi:n skickar avgörandena till. Inställningar på Pi:n, i `config.local.json`:
+
+```json
+"hd_dokument_url": "webbapp-adressen från Apps Script",
+"hd_dokument_nyckel": "samma hemliga nyckel som i skriptet"
+```
+
+Saknas de kommer bara notiserna. Om dokumentet inte går att skriva till
+försöker Pi:n igen vid varje körning och varnar högst en gång per dygn.
+
+| Vad | Kommando |
+|---|---|
+| Visa de tre senaste HD-avgörandena | `./venv/bin/python bevakningar/hd_avgoranden.py --senaste` |
+| Provskriv det senaste i dokumentet | `./venv/bin/python bevakningar/hd_avgoranden.py --provskriv` |
+
 ## Principer
 
 Bevakningarna läser bara. De bokar, köper eller fyller aldrig i något, och de
