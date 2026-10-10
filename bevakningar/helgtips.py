@@ -43,8 +43,8 @@ MANADER = ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augus
            "september", "oktober", "november", "december"]
 
 INSTRUKTION = """Du är kulturredaktör på en Stockholmstidning och skriver helgtips i stil med DN På Stan.
-Läsaren är en urban, medelålders, välutbildad familj i Stockholm. Tipsen kommer som en
-mobilnotis lördag morgon kl. 9.
+Läsaren är ett urbant, medelålders, välutbildat par i Stockholm med barn i tonåren. Tipsen
+kommer som en mobilnotis lördag morgon kl. 9.
 
 Helgen gäller {lordag} och {sondag}.
 
@@ -54,8 +54,10 @@ film och Cinemateket, föredrag och samtal, marknader, mat och utflykter i stade
 Kolla också SMHI:s prognos för Stockholm i helgen och anpassa: inomhus om det regnar,
 gärna något utomhus om det blir fint.
 
-Välj 6–8 tips. Blanda: minst ett som passar hela familjen, gärna något gratis och gärna något
-som är sista chansen. Undvik det självklara turistiga om det inte händer något särskilt där.
+Välj 6–8 tips. De flesta ska rikta sig till de vuxna. Gärna ett tips som föräldrar och
+tonåringar kan göra tillsammans, men det ska då passa unga vuxna – till exempel en konsert,
+en film, en utställning eller ett matställe – aldrig barnaktiviteter, sagostunder, lekland,
+barnteater eller liknande. Gärna något gratis och gärna något som är sista chansen. Undvik det självklara turistiga om det inte händer något särskilt där.
 Kontrollera datum och tider noga – tipsa bara om sådant som verkligen går den här helgen.
 Hitta inte på något. Hittar du inte säkra uppgifter om en sak, ta inte med den.
 
