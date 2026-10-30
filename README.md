@@ -140,7 +140,7 @@ Tipsen sparas också i `state/helgtips/`. Kostnad: några kronor per helg.
 ## Flygfynd
 
 `bevakningar/flygfynd.py` letar efter riktigt billiga helgresor i Europa för familjen:
-ut lördag förmiddag (05–12), hem söndag eftermiddag (13–21), från Arlanda eller Skavsta,
+ut lördag förmiddag (05–12), hem söndag eftermiddag (14.30–21), från Arlanda eller Skavsta,
 fyra vuxenbiljetter. Notis kommer **bara** när totalpriset för alla fyra tur och retur
 ligger under gränsen (standard 4 000 kr). Annars hörs ingenting.
 

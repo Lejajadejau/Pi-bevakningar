@@ -8,7 +8,7 @@ Så här går det till (SerpApi, som hämtar Google Flights):
 1. Google "Explore" ger, för en viss helg, de billigaste resmålen i Europa
    från ARN/NYO – en sökning per helg täcker alla städer.
 2. Resmål som ser billiga ut kontrolleras med en riktig sökning för fyra
-   vuxna med tidsfönster (lördag 05–12 ut, söndag 13–21 hem), plus en
+   vuxna med tidsfönster (lördag 05–12 ut, söndag 14.30–21 hem), plus en
    sökning på hemresan. Först då blir det ett fynd.
 
 Gratisnivån hos SerpApi är 250 sökningar i månaden. Bevakningen sprider
@@ -45,7 +45,8 @@ EUROPA = "/m/02j9z"             # Google-id för Europa
 RESENARER = 4
 STANDARD_GRANS_KR = 4000
 UT_TIDER = (5, 12)              # lördag, avgång mellan 05 och 12
-HEM_TIDER = (13, 21)            # söndag, avgång mellan 13 och 21
+HEM_TIDER = (14, 21)            # söndag, avgång mellan 14.30 och 21
+HEM_TIDIGAST = "14:30"          # tidigaste avgång hem (finare än hela timmar)
 ANTAL_HELGER = 8                # cirka två månader framåt
 HELGER_PER_KORNING = 4          # hälften varje dygn → varje helg varannan dag
 MAX_KONTROLLER_PER_KORNING = 3  # fördjupade sökningar per körning
@@ -161,9 +162,11 @@ def _explore(sokare, lordag, direkt):
     return sorted(kandidater, key=lambda k: k["pris_pp"])
 
 
-def _inom(tid, fonster):
+def _inom(tid, fonster, tidigast=None):
     h = _timme(tid)
-    return h is not None and fonster[0] <= h < fonster[1]
+    if h is None or not (fonster[0] <= h < fonster[1]):
+        return False
+    return tidigast is None or _klockslag(tid) >= tidigast
 
 
 def _kontrollera(sokare, lordag, kand, direkt):
@@ -204,7 +207,7 @@ def _kontrollera(sokare, lordag, kand, direkt):
                                return_date=sondag.isoformat(), adults=RESENARER,
                                departure_token=alt["departure_token"])
             hem = [a for a in (retur.get("best_flights") or []) + (retur.get("other_flights") or [])
-                   if a.get("flights") and _inom(a["flights"][0]["departure_airport"].get("time", ""), HEM_TIDER)]
+                   if a.get("flights") and _inom(a["flights"][0]["departure_airport"].get("time", ""), HEM_TIDER, HEM_TIDIGAST)]
             if not hem:
                 return None  # ingen hemresa på söndagseftermiddagen till det priset
             hem.sort(key=lambda a: _tal(a.get("price")) or 1e9)
