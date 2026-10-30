@@ -137,6 +137,33 @@ Tipsen sparas också i `state/helgtips/`. Kostnad: några kronor per helg.
 |---|---|
 | Ta fram tips för kommande helg nu (ingen notis) | `./venv/bin/python bevakningar/helgtips.py --testa` |
 
+## Flygfynd
+
+`bevakningar/flygfynd.py` letar efter riktigt billiga helgresor i Europa för familjen:
+ut lördag förmiddag (05–12), hem söndag eftermiddag (13–21), från Arlanda eller Skavsta,
+fyra vuxenbiljetter. Notis kommer **bara** när totalpriset för alla fyra tur och retur
+ligger under gränsen (standard 4 000 kr). Annars hörs ingenting.
+
+Priserna kommer från Google Flights via SerpApi. En sökning per helg ger de billigaste
+resmålen i Europa; de som ser billiga ut kontrolleras sedan med en riktig sökning för fyra
+personer med rätt tider. Varje helg de närmaste cirka två månaderna kollas varannan dag.
+Gratisnivån (250 sökningar i månaden) räcker, och bevakningen pausar själv om kontot
+börjar ta slut.
+
+Inställningar i `config.local.json` (nyckeln ska **aldrig** in i arkivet, det är offentligt):
+
+```json
+"serpapi_nyckel": "nyckeln från serpapi.com",
+"flygfynd_grans_kr": 4000,
+"flygfynd_direkt": true
+```
+
+| Vad | Kommando |
+|---|---|
+| Testa mot nästa helg (ingen notis) | `./venv/bin/python bevakningar/flygfynd.py --testa` |
+
+Priserna är Googles uppgifter vid sökningen och kan ha ändrats när man bokar.
+
 ## Principer
 
 Bevakningarna läser bara. De bokar, köper eller fyller aldrig i något, och de
