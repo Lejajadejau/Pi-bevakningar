@@ -110,7 +110,13 @@ class Sokare:
     def sok(self, **p):
         self.antal += 1
         p.update({"api_key": self.nyckel, "currency": "SEK", "gl": "se", "hl": "sv"})
-        return _hamta(API, p)
+        try:
+            return _hamta(API, p)
+        except RuntimeError as fel:
+            # Tomt svar (inga flyg som passar) är inget fel – bara inget fynd.
+            if "hasn't returned any results" in str(fel):
+                return {}
+            raise
 
 
 def _helger(idag):
