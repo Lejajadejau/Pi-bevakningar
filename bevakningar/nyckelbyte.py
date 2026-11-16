@@ -56,8 +56,29 @@ def _prova(nyckel, arbetsyta):
                            f"{e.read().decode('utf-8', 'replace')[:200]}")
 
 
+def _rapportera(text):
+    """Lägesrapport utan hemligheter, så att Claude kan se att bytet gick igenom."""
+    try:
+        req = urllib.request.Request(f"https://ntfy.sh/{AMNE}", data=text.encode("utf-8"),
+                                     method="POST", headers={"Title": "pi-status"})
+        urllib.request.urlopen(req, timeout=30).read()
+    except Exception:
+        pass
+
+
 def kontrollera(_webblasare=None):
+    try:
+        return _kontrollera()
+    except Exception as fel:
+        _rapportera(f"fel: {str(fel)[:200]}")
+        raise
+
+
+def _kontrollera():
     if (MAPP / "klar").exists():
+        if not (MAPP / "rapporterad").exists():
+            _rapportera("klar: nyckeln provad och bytt")
+            (MAPP / "rapporterad").write_text("ja")
         return []
     MAPP.mkdir(parents=True, exist_ok=True)
     privat, publik = MAPP / "privat.pem", MAPP / "publik.pem"
@@ -101,6 +122,8 @@ def kontrollera(_webblasare=None):
     tmp.write_text(json.dumps(konfig, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp.replace(KONFIG)
     (MAPP / "klar").write_text("ja")
+    _rapportera("klar: nyckeln provad och bytt")
+    (MAPP / "rapporterad").write_text("ja")
     return [{"id": "nyckelbyte-klar", "titel": "🔑 Claude-nyckeln är bytt",
              "text": "Pi:n använder nu API-nyckeln från papperskvarnen-kontot, där Max-abonnemangets "
                      "krediter ingår. Den gamla nyckeln finns kvar som reserv.",
