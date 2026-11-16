@@ -146,9 +146,9 @@ ligger under gränsen (standard 4 000 kr). Annars hörs ingenting.
 
 Priserna kommer från Google Flights via SerpApi. En sökning per helg ger de billigaste
 resmålen i Europa; de som ser billiga ut kontrolleras sedan med en riktig sökning för fyra
-personer med rätt tider. Varje helg de närmaste cirka två månaderna kollas varannan dag.
-Gratisnivån (250 sökningar i månaden) räcker, och bevakningen pausar själv om kontot
-börjar ta slut.
+personer med rätt tider. Varje helg de närmaste cirka två månaderna kollas var tredje dag,
+med högst två fördjupade kontroller per dygn – ungefär 100–140 sökningar i månaden, så att
+gratisnivån (250) räcker även för Fitouflyg. Bevakningen pausar själv om kontot börjar ta slut.
 
 Inställningar i `config.local.json` (nyckeln ska **aldrig** in i arkivet, det är offentligt):
 

@@ -11,8 +11,8 @@ Så här går det till (SerpApi, som hämtar Google Flights):
    vuxna med tidsfönster (lördag 05–12 ut, söndag 14.30–21 hem), plus en
    sökning på hemresan. Först då blir det ett fynd.
 
-Gratisnivån hos SerpApi är 250 sökningar i månaden. Bevakningen sprider
-helgerna över dygnen och stannar om kontot börjar ta slut.
+Gratisnivån hos SerpApi är 250 sökningar i månaden och delas med Fitouflyg.
+Bevakningen sprider helgerna över tre dygn och stannar om kontot börjar ta slut.
 
 Ruth och Klas räknas som vuxna (barnpris gäller oftast bara under 12 år).
 
@@ -48,8 +48,8 @@ UT_TIDER = (5, 12)              # lördag, avgång mellan 05 och 12
 HEM_TIDER = (14, 21)            # söndag, avgång mellan 14.30 och 21
 HEM_TIDIGAST = "14:30"          # tidigaste avgång hem (finare än hela timmar)
 ANTAL_HELGER = 8                # cirka två månader framåt
-HELGER_PER_KORNING = 4          # hälften varje dygn → varje helg varannan dag
-MAX_KONTROLLER_PER_KORNING = 3  # fördjupade sökningar per körning
+HELGER_PER_KORNING = 3          # en tredjedel varje dygn → varje helg var tredje dag
+MAX_KONTROLLER_PER_KORNING = 2  # fördjupade sökningar per körning
 RESERV_SOKNINGAR = 15           # stanna när så här få sökningar återstår
 FYND_GILTIGT_DAGAR = 5          # ett fynd visas så länge det kontrollerats nyligen
 
@@ -260,7 +260,7 @@ def kontrollera(_webblasare=None, test=False):
         helger = helger[:1]
     else:
         omgang = tillstand.get("omgang", 0)
-        helger = helger[omgang % 2::2][:HELGER_PER_KORNING]
+        helger = helger[omgang % 3::3][:HELGER_PER_KORNING]
         tillstand["omgang"] = omgang + 1
 
     fynd = {k: v for k, v in tillstand.get("fynd", {}).items()
