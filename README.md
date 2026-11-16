@@ -164,6 +164,33 @@ Inställningar i `config.local.json` (nyckeln ska **aldrig** in i arkivet, det �
 
 Priserna är Googles uppgifter vid sökningen och kan ha ändrats när man bokar.
 
+## Fitouflyg
+
+`bevakningar/fitouflyg.py` bevakar flyg mellan Arlanda/Skavsta och flygplatserna runt
+Fitou: Barcelona, Perpignan, Montpellier och Béziers. Det finns **inget pristak** –
+notis kommer när priset är *relativt sett* lågt: när Google Flights bedömer nivån som
+låg eller under det normala prisspannet, eller när priset ligger minst 15 % under vad
+bevakningen själv brukar se för samma resa.
+
+- **Långhelger och lov** – tur och retur, första till sista lediga dagen. Långhelgerna
+  räknas ut automatiskt (påsk, Kristi himmelfärd med klämdag, 1 maj, nationaldagen,
+  trettondagen). Infaller nationaldagen på en helg söks både fre–sön och lör–mån.
+  Loven kommer från `data/lov_stockholm.json` (Stockholms stads lovdatum, uppdateras
+  en gång per läsår; saknas ett år gäller sportlov v.9 och höstlov v.44). Vanliga
+  helger söks inte. Notis direkt när en långhelg är billig, och igen om priset sjunker.
+- **Sommaren** – dagen efter skolavslutningen till 15 augusti, enkelresor ner och hem
+  var för sig, var tredje dag. Sammanfattning varje söndag med de billigaste dagarna.
+
+Priser per vuxen. SerpApi-kontot delas med Flygfynd: Fitouflyg tar högst 70 sökningar
+i månaden (`"fitou_max_per_manad"` i `config.local.json`) och lämnar alltid minst 40
+kvar på kontot.
+
+| Vad | Kommando |
+|---|---|
+| Visa vilka resor som bevakas (inga sökningar) | `./venv/bin/python bevakningar/fitouflyg.py --plan` |
+| Provsök en långhelg och en sommardag (ingen notis) | `./venv/bin/python bevakningar/fitouflyg.py --testa` |
+| Visa senast sedda priser | `./venv/bin/python bevakningar/fitouflyg.py --lage` |
+
 ## Principer
 
 Bevakningarna läser bara. De bokar, köper eller fyller aldrig i något, och de

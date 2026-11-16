@@ -1,0 +1,12 @@
+{
+  "_kalla": "Stockholms stad, Terminer och lov i grundskolan (grundskola.stockholm), hämtat 2026-11-16",
+  "_forklaring": "Lediga perioder räknas från första lediga dag till sista, helger inräknade. Saknas ett läsår används reservregler i fitouflyg.py (sportlov v.9, höstlov v.44).",
+  "lov": [
+    {"namn": "Jullov", "fran": "2026-12-19", "till": "2027-01-10"},
+    {"namn": "Sportlov", "fran": "2027-02-27", "till": "2027-03-07"},
+    {"namn": "Påsklov", "fran": "2027-03-26", "till": "2027-04-04"}
+  ],
+  "sommarlov": [
+    {"ar": 2027, "skolavslutning": "2027-06-11"}
+  ]
+}
