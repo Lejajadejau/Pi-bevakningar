@@ -109,6 +109,10 @@ Inställningar på Pi:n, i `config.local.json`:
 "claude_modell": "valfritt, standard claude-opus-5-5"
 ```
 
+Sedan 16 november 2026 är `claude_nyckel` nyckeln *raspberry* i papperskvarnen-kontots Console-organisation
+(Johan's Individual Org), där Max-abonnemangets månadskrediter ingår. Den tidigare nyckeln (wellanjohan-kontot,
+med köpta krediter) ligger kvar som `claude_nyckel_reserv` i `config.local.json`.
+
 Utan nyckel används HD:s egen korta sammanfattning. Om något går fel
 kommer notisen ändå, Pi:n försöker igen nästa dygn och varnar högst en gång per dygn.
 
