@@ -12,8 +12,11 @@ Två delar:
    Långhelgerna räknas ut automatiskt ur de svenska helgdagarna och klämdagarna
    (påsk, Kristi himmelfärd, 1 maj, nationaldagen, trettondagen). Infaller
    nationaldagen på en helg söks både fredag–söndag och lördag–måndag.
-   Loven (jul-, sport-, påsk- och höstlov) hämtas ur data/lov_stockholm.json,
-   som följer Stockholms stads lovdatum och uppdateras en gång per läsår.
+   Loven (jul-, sport-, påsk- och höstlov) och skolavslutningen följer
+   Stockholms stads lovdatum. Pi:n läser stadens sida en gång i månaden och
+   låter Claude plocka ut datumen (sparas i state/lov_stockholm.json), så nya
+   läsår kommer med av sig själva. data/lov_stockholm.json är grunden om
+   hämtningen inte fungerar.
    Vanliga helger söks inte. Notis kommer direkt när en långhelg är billig,
    och på nytt om priset sjunker ytterligare.
 
@@ -36,6 +39,7 @@ Kommandon:
   ./venv/bin/python bevakningar/fitouflyg.py --plan    visar vilka resor som bevakas (inga sökningar)
   ./venv/bin/python bevakningar/fitouflyg.py --testa   provsöker en långhelg och en sommardag (ingen notis)
   ./venv/bin/python bevakningar/fitouflyg.py --lage    visar senaste priserna som bevakningen sett
+  ./venv/bin/python bevakningar/fitouflyg.py --lov     hämtar stadens lovdatum nu och visar dem (sparar inget)
 """
 
 import datetime as dt
@@ -43,6 +47,8 @@ import json
 import statistics
 import sys
 import time
+import re
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -74,6 +80,11 @@ ROT = Path(__file__).resolve().parent.parent
 KONFIG = ROT / "config.local.json"
 LOVFIL = ROT / "data" / "lov_stockholm.json"
 TILLSTAND = ROT / "state" / "fitouflyg.json"
+HAMTADE_LOV = ROT / "state" / "lov_stockholm.json"
+LOVSIDA = "https://grundskola.stockholm/en/school-terms-and-vacation-periods-for-compulsory-school/"
+LOV_UPPDATERING_DAGAR = 30
+CLAUDE = "https://api.anthropic.com/v1/messages"
+LOV_MODELL = "claude-sonnet-5-5"
 API = "https://serpapi.com/search.json"
 KONTO_API = "https://serpapi.com/account.json"
 
@@ -211,8 +222,95 @@ def _vecka(ar, vecka):
     return mandag - dt.timedelta(days=2), mandag + dt.timedelta(days=6)
 
 
+def _lovdata():
+    """Grundfilen i arkivet, kompletterad och ersatt av det Pi:n själv har hämtat."""
+    lov, sommar = {}, {}
+    for kalla in (_las_json(LOVFIL, {}), _las_json(HAMTADE_LOV, {})):
+        for l in kalla.get("lov", []):
+            lov[(l["namn"], dt.date.fromisoformat(l["fran"]).year, dt.date.fromisoformat(l["fran"]).month)] = l
+        for s in kalla.get("sommarlov", []):
+            sommar[s["ar"]] = s
+    return {"lov": list(lov.values()), "sommarlov": list(sommar.values())}
+
+
+LOV_INSTRUKTION = """Nedan är texten från Stockholms stads sida om terminer och lov i grundskolan.
+Dagens datum är {idag}. Plocka ut alla lov och skolavslutningar som står där.
+
+Ange varje lov som en sammanhängande ledig period för eleverna, från första till sista
+lediga dagen, med angränsande lördagar, söndagar och helgdagar inräknade. Exempel: ett
+sportlov måndag–fredag vecka 9 blir lördagen före till söndagen efter. Jullovet är dagen
+efter höstterminens sista dag till dagen före vårterminens första dag. Påsklovet tar med
+långfredagen till annandag påsk om de ligger i anslutning. Ta inte med enstaka lovdagar
+(t.ex. klämdagen efter Kristi himmelfärd) – de räknas ut på annat sätt.
+
+Svara ENBART med JSON i exakt denna form, utan annan text:
+{{"lov": [{{"namn": "Jullov|Sportlov|Påsklov|Höstlov", "fran": "ÅÅÅÅ-MM-DD", "till": "ÅÅÅÅ-MM-DD"}}],
+  "sommarlov": [{{"ar": ÅÅÅÅ, "skolavslutning": "ÅÅÅÅ-MM-DD"}}]}}
+
+Sidans text:
+{text}"""
+
+
+def _uppdatera_lov(konfig, idag, tvinga=False):
+    """Hämtar stadens lovdatum högst en gång per månad. Fel stoppar inte bevakningen."""
+    if not konfig.get("claude_nyckel"):
+        return "claude_nyckel saknas – använder lovdatumen i arkivet"
+    sparat = _las_json(HAMTADE_LOV, {})
+    if not tvinga and time.time() - sparat.get("hamtat", 0) < LOV_UPPDATERING_DAGAR * 86400:
+        return None
+    try:
+        req = urllib.request.Request(LOVSIDA, headers={"User-Agent": "Mozilla/5.0 pi-bevakningar"})
+        with urllib.request.urlopen(req, timeout=60) as svar:
+            html = svar.read().decode("utf-8", "replace")
+        html = re.sub(r"(?is)<(script|style|nav|footer|header)\b.*?</\1>", " ", html)
+        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()[:30000]
+
+        huvuden = {"Content-Type": "application/json", "anthropic-version": "2023-06-01",
+                   "Authorization": "Bearer " + konfig["claude_nyckel"].strip()}
+        if konfig.get("claude_arbetsyta"):
+            huvuden["anthropic-workspace-id"] = konfig["claude_arbetsyta"].strip()
+        kropp = json.dumps({"model": konfig.get("fitou_lov_modell") or LOV_MODELL, "max_tokens": 2000,
+                            "messages": [{"role": "user", "content": LOV_INSTRUKTION.format(
+                                idag=idag.isoformat(), text=text)}]}).encode("utf-8")
+        req = urllib.request.Request(CLAUDE, data=kropp, method="POST", headers=huvuden)
+        with urllib.request.urlopen(req, timeout=180) as svar:
+            svarstext = "".join(b.get("text", "") for b in json.loads(svar.read().decode("utf-8"))["content"]
+                                if b.get("type") == "text")
+        data = json.loads(svarstext[svarstext.index("{"): svarstext.rindex("}") + 1])
+
+        lov = []
+        for l in data.get("lov", []):
+            fran, till = dt.date.fromisoformat(l["fran"]), dt.date.fromisoformat(l["till"])
+            if l.get("namn") in ("Jullov", "Sportlov", "Påsklov", "Höstlov") and 0 <= (till - fran).days <= 35:
+                lov.append({"namn": l["namn"], "fran": fran.isoformat(), "till": till.isoformat()})
+        sommar = []
+        for s in data.get("sommarlov", []):
+            avsl = dt.date.fromisoformat(s["skolavslutning"])
+            if avsl.month == 6 and avsl.year == int(s["ar"]):
+                sommar.append({"ar": avsl.year, "skolavslutning": avsl.isoformat()})
+        if not lov and not sommar:
+            raise ValueError("inga lovdatum i svaret")
+    except Exception as fel:
+        sparat["hamtat"] = time.time() - (LOV_UPPDATERING_DAGAR - 3) * 86400  # försök igen om tre dagar
+        if "--test" not in sys.argv:
+            HAMTADE_LOV.parent.mkdir(exist_ok=True)
+            HAMTADE_LOV.write_text(json.dumps(sparat, ensure_ascii=False, indent=2), encoding="utf-8")
+        return f"kunde inte uppdatera lovdatumen: {fel}"
+
+    # Behåll tidigare hämtade läsår som inte längre står på sidan.
+    nya_nycklar = {(l["namn"], l["fran"][:7]) for l in lov}
+    lov += [l for l in sparat.get("lov", []) if (l["namn"], l["fran"][:7]) not in nya_nycklar]
+    sommar += [s for s in sparat.get("sommarlov", []) if s["ar"] not in {x["ar"] for x in sommar}]
+    nytt = {"hamtat": time.time(), "kalla": LOVSIDA, "lov": sorted(lov, key=lambda l: l["fran"]),
+            "sommarlov": sorted(sommar, key=lambda s: s["ar"])}
+    if "--test" not in sys.argv:
+        HAMTADE_LOV.parent.mkdir(exist_ok=True)
+        HAMTADE_LOV.write_text(json.dumps(nytt, ensure_ascii=False, indent=2), encoding="utf-8")
+    return nytt
+
+
 def _lov_och_sommar(ar_lista):
-    data = _las_json(LOVFIL, {"lov": [], "sommarlov": []})
+    data = _lovdata()
     lov = [(l["namn"], dt.date.fromisoformat(l["fran"]), dt.date.fromisoformat(l["till"]))
            for l in data.get("lov", [])]
     kanda = {(n, f.year) for n, f, _ in lov}
@@ -415,6 +513,9 @@ def kontrollera(_webblasare=None, test=False):
     max_manad = int(konfig.get("fitou_max_per_manad", STANDARD_MAX_PER_MANAD))
 
     idag = dt.datetime.now(STOCKHOLM).date()
+    lovresultat = _uppdatera_lov(konfig, idag)
+    if isinstance(lovresultat, str):
+        print(f"Fitouflyg: {lovresultat}")
     tillstand = _las_json(TILLSTAND, {})
     manad = idag.strftime("%Y-%m")
     if tillstand.get("manad") != manad:
@@ -511,7 +612,12 @@ def _visa_lage():
 
 
 if __name__ == "__main__":
-    if "--plan" in sys.argv:
+    if "--lov" in sys.argv:
+        sys.argv.append("--test")
+        res = _uppdatera_lov(_las_json(KONFIG, {}), dt.datetime.now(STOCKHOLM).date(), tvinga=True)
+        print(res if isinstance(res, str) else json.dumps({k: res[k] for k in ("lov", "sommarlov")},
+                                                           ensure_ascii=False, indent=2))
+    elif "--plan" in sys.argv:
         _visa_plan()
     elif "--lage" in sys.argv:
         _visa_lage()

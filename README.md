@@ -175,8 +175,11 @@ bevakningen själv brukar se för samma resa.
 - **Långhelger och lov** – tur och retur, första till sista lediga dagen. Långhelgerna
   räknas ut automatiskt (påsk, Kristi himmelfärd med klämdag, 1 maj, nationaldagen,
   trettondagen). Infaller nationaldagen på en helg söks både fre–sön och lör–mån.
-  Loven kommer från `data/lov_stockholm.json` (Stockholms stads lovdatum, uppdateras
-  en gång per läsår; saknas ett år gäller sportlov v.9 och höstlov v.44). Vanliga
+  Loven och skolavslutningen följer Stockholms stad: en gång i månaden läser Pi:n stadens
+  sida om terminer och lov och låter Claude plocka ut datumen (`claude_nyckel`, kostar
+  under en krona). Nya läsår kommer alltså med av sig själva. `data/lov_stockholm.json`
+  är grunden om hämtningen inte fungerar; saknas ett år helt gäller sportlov v.9 och
+  höstlov v.44. Vanliga
   helger söks inte. Notis direkt när en långhelg är billig, och igen om priset sjunker.
 - **Sommaren** – dagen efter skolavslutningen till 15 augusti, enkelresor ner och hem
   var för sig, var tredje dag. Sammanfattning varje söndag med de billigaste dagarna.
@@ -190,6 +193,7 @@ kvar på kontot.
 | Visa vilka resor som bevakas (inga sökningar) | `./venv/bin/python bevakningar/fitouflyg.py --plan` |
 | Provsök en långhelg och en sommardag (ingen notis) | `./venv/bin/python bevakningar/fitouflyg.py --testa` |
 | Visa senast sedda priser | `./venv/bin/python bevakningar/fitouflyg.py --lage` |
+| Hämta stadens lovdatum nu och visa dem | `./venv/bin/python bevakningar/fitouflyg.py --lov` |
 
 ## Principer
 
