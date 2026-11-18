@@ -1,4 +1,4 @@
-"""ANT-bevakning – Anthropic (Nasdaq: ANT) efter börsnoteringen 18 november 2026.
+"""ANT-bevakning – Anthropic (Nasdaq: ANT) efter börsnoteringen 19 november 2026.
 
 Larmar när
   * kursen går under introduktionspriset,
@@ -22,7 +22,7 @@ AKTIV = True
 BEHOVER_WEBBLASARE = False
 
 TICKER = "ANT"
-NOTERINGSDAG = date(2026, 11, 18)
+NOTERINGSDAG = date(2026, 11, 19)
 
 # Fylls i när priset är satt (intervallet är 70–78 dollar). None = larmet är avstängt.
 INTRO_PRIS = None
@@ -33,9 +33,9 @@ ATERSTALL_MARGINAL = 0.03  # kursen måste upp 3 % över intropriset innan larme
 
 # Påminnelser skickas dagen före. Datumen är ungefärliga tills bolaget meddelat exakta datum.
 PAMINNELSER = {
-    date(2026, 12, 14): "Ca dag 27: övriga aktieägare börjar få sälja låsta aktier i steg.",
-    date(2027, 2, 2): "Ca dag 76: upp till 1,6 miljarder aktier kan då ha blivit säljbara.",
-    date(2027, 5, 17): "Ca dag 180: grundarna får sälja upp till 29 % av sina aktier.",
+    date(2026, 12, 15): "Ca dag 27: övriga aktieägare börjar få sälja låsta aktier i steg.",
+    date(2027, 2, 3): "Ca dag 76: upp till 1,6 miljarder aktier kan då ha blivit säljbara.",
+    date(2027, 5, 18): "Ca dag 180: grundarna får sälja upp till 29 % av sina aktier.",
     # Rapportdatum läggs till när de är kända, t.ex.:
     # date(2027, 2, 25): "Helårsrapport 2026 – därefter blir ytterligare 35 % säljbara.",
 }
