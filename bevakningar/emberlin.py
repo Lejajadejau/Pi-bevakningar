@@ -1,7 +1,7 @@
 """Emberlin – lediga bord för 4 via SevenRooms (bokningslänken på emberlinstockholm.com).
 
 Larmar när ett bord går att boka direkt (inte bara skicka förfrågan om)
-tisdag–torsdag med starttid 17.00–18.00, 15 mars–30 april 2027.
+tisdag–torsdag med starttid 17.00–18.00, 9 mars–30 april 2027.
 """
 
 import json
@@ -15,7 +15,7 @@ BEHOVER_WEBBLASARE = False
 
 VENUE = "emberlin"
 ANTAL = 4
-FORSTA = date(2027, 3, 15)
+FORSTA = date(2027, 3, 9)
 SISTA = date(2027, 4, 30)
 VECKODAGAR = {1, 2, 3}          # tisdag, onsdag, torsdag (måndag = 0)
 TIDIGAST, SENAST = "17:00", "18:00"
