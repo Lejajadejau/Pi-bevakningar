@@ -24,8 +24,8 @@ BEHOVER_WEBBLASARE = False
 TICKER = "ANT"
 NOTERINGSDAG = date(2026, 11, 19)
 
-# Fylls i när priset är satt (intervallet är 70–78 dollar). None = larmet är avstängt.
-INTRO_PRIS = None
+# Introduktionspris, satt 18 november 2026 (över intervallet 70–78 dollar).
+INTRO_PRIS = 83.00
 
 FALL_FRAN_TOPP = 0.30   # 30 % under högsta stängningskurs
 DAGSFALL = 0.08         # 8 % på en dag
