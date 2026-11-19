@@ -44,10 +44,11 @@ def kontrollera(webblasare=None):
         return []
     data = {}
     start = max(FORSTA, idag)
+    # SevenRooms godtar bara num_days = 1 eller 3 (inte 2, 5 eller 7). Vi frågar alltid
+    # om 3 dagar; dagar efter SISTA sorteras bort nedan.
     while start <= SISTA:
-        dagar = min(7, (SISTA - start).days + 1)
-        data.update(_hamta(start, dagar))
-        start += timedelta(days=dagar)
+        data.update(_hamta(start, 3))
+        start += timedelta(days=3)
 
     fynd = []
     for datum_str, pass_lista in data.items():
