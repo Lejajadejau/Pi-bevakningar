@@ -120,6 +120,12 @@ def _hamta(url, parametrar):
     return data
 
 
+def _tomt_svar(fel):
+    """SerpApi säger "inga träffar" på olika sätt – det är inget fel, bara inget fynd."""
+    text = str(fel).lower()
+    return "hasn't returned any results" in text or "empty results" in text
+
+
 class Sokare:
     def __init__(self, nyckel):
         self.nyckel = nyckel
@@ -135,7 +141,7 @@ class Sokare:
         try:
             return _hamta(API, p)
         except RuntimeError as fel:
-            if "hasn't returned any results" in str(fel):
+            if _tomt_svar(fel):
                 return {}
             raise
 

@@ -2,7 +2,7 @@
 
 Letar efter riktigt billiga tur och retur-resor från Arlanda och Skavsta:
 ut lördag förmiddag, hem söndag eftermiddag. Notis kommer bara när totalpriset
-för fyra personer är under gränsen (standard 4 000 kr). Annars hörs ingenting.
+för fyra personer är under gränsen (flygfynd_grans_kr, nu 6 000 kr). Annars hörs ingenting.
 
 Så här går det till (SerpApi, som hämtar Google Flights):
 1. Google "Explore" ger, för en viss helg, de billigaste resmålen i Europa
@@ -97,6 +97,12 @@ def _hamta(url, parametrar):
     return data
 
 
+def _tomt_svar(fel):
+    """SerpApi säger "inga träffar" på olika sätt – det är inget fel, bara inget fynd."""
+    text = str(fel).lower()
+    return "hasn't returned any results" in text or "empty results" in text
+
+
 class Sokare:
     def __init__(self, nyckel):
         self.nyckel = nyckel
@@ -114,7 +120,7 @@ class Sokare:
             return _hamta(API, p)
         except RuntimeError as fel:
             # Tomt svar (inga flyg som passar) är inget fel – bara inget fynd.
-            if "hasn't returned any results" in str(fel):
+            if _tomt_svar(fel):
                 return {}
             raise
 
@@ -268,11 +274,18 @@ def kontrollera(_webblasare=None, test=False):
             and time.time() - v["kontrollerad"] < FYND_GILTIGT_DAGAR * 86400}
 
     kontroller = 0
+    misslyckade = 0
     for lordag in helger:
         if kvar - sokare.antal <= RESERV_SOKNINGAR:
             print(f"Flygfynd: bara {kvar - sokare.antal} sökningar kvar hos SerpApi – pausar.")
             break
-        kandidater = _explore(sokare, lordag, direkt)
+        try:
+            kandidater = _explore(sokare, lordag, direkt)
+        except RuntimeError as fel:
+            # En helg som strular ska inte stoppa de andra.
+            print(f"Flygfynd: helgen {lordag} gick inte att söka ({fel}) – hoppar över.")
+            misslyckade += 1
+            continue
         if test:
             print(f"Helgen {lordag}: {len(kandidater)} resmål. Billigast per person:")
             for k in kandidater[:8]:
@@ -292,6 +305,9 @@ def kontrollera(_webblasare=None, test=False):
                                      "land": kand["land"], "kontrollerad": time.time(), **res}
             else:
                 fynd.pop(nyckel_fynd, None)
+
+    if helger and misslyckade == len(helger):
+        raise RuntimeError("SerpApi: ingen av helgerna gick att söka – se loggen")
 
     tillstand["fynd"] = fynd
     tillstand["senast_kvar"] = kvar - sokare.antal
