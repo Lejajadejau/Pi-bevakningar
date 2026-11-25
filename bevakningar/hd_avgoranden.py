@@ -108,10 +108,14 @@ def _hamta_publiceringar(antal=100):
     return data
 
 
+# Avgöranden som räknas. Prövningstillstånd (PROVNINGSTILLSTAND) räknas inte.
+AVGORANDETYPER = {"PREJUDIKAT", "VAGLEDANDE_MEN_EJ_PREJUDICERANDE"}
+
+
 def _ar_avgorande(p):
     return (
         p.get("domstol", {}).get("domstolKod") == "HDO"
-        and p.get("typ") == "PREJUDIKAT"
+        and p.get("typ") in AVGORANDETYPER
         and p.get("publiceringsform") != "REFERAT"
     )
 
@@ -141,6 +145,7 @@ def _uppgifter(p):
         "nyckelord": p.get("nyckelordLista") or [],
         "lagrum": [l.get("referens", "") for l in (p.get("lagrumLista") or []) if l.get("referens")],
         "lank": LANK.format(id=p["id"]),
+        "vagledande": p.get("typ") == "VAGLEDANDE_MEN_EJ_PREJUDICERANDE",
         "pdf": pdf,
     }
 
@@ -285,7 +290,8 @@ def _med_sammanfattning(konfig, u, cache):
 # --- Notis och dokument -----------------------------------------------------------
 
 def _rubrik(u):
-    return u["malnummer"] + (f" – ”{u['benamning']}”" if u["benamning"] else "")
+    r = u["malnummer"] + (f" – ”{u['benamning']}”" if u["benamning"] else "")
+    return r + (" (vägledande, ej prejudikat)" if u.get("vagledande") else "")
 
 
 def _notistext(u):
